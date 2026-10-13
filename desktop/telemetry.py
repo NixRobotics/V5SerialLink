@@ -32,7 +32,11 @@ def _number(value: object, field: str) -> float:
 
 
 def parse_telemetry(line: bytes) -> Telemetry | None:
-    """Ignore ordinary console text; validate JSON telemetry strictly."""
+    """Ignore ordinary console text; validate JSON telemetry strictly.
+    
+    Supports both verbose keys ("x_mm", "y_mm", "heading_deg", "motor_temperatures_c")
+    and compact keys ("x", "y", "h", "m") for high-frequency serial links.
+    """
     try:
         text = line.decode("utf-8").strip()
     except UnicodeDecodeError as error:
@@ -45,10 +49,22 @@ def parse_telemetry(line: bytes) -> Telemetry | None:
         raise TelemetryError(f"Invalid telemetry JSON: {error}") from error
     if not isinstance(packet, dict):
         raise TelemetryError("Telemetry must be a JSON object")
-    for field in ("x_mm", "y_mm", "heading_deg", "motor_temperatures_c"):
-        if field not in packet:
-            raise TelemetryError(f"Missing telemetry field: {field}")
-    temperatures = packet["motor_temperatures_c"]
+
+    # Resolve coordinates and heading (compact or verbose)
+    x_val = packet.get("x", packet.get("x_mm"))
+    if x_val is None:
+        raise TelemetryError("Missing telemetry field: x (or x_mm)")
+    y_val = packet.get("y", packet.get("y_mm"))
+    if y_val is None:
+        raise TelemetryError("Missing telemetry field: y (or y_mm)")
+    h_val = packet.get("h", packet.get("heading_deg"))
+    if h_val is None:
+        raise TelemetryError("Missing telemetry field: h (or heading_deg)")
+
+    # Resolve motor temperatures
+    temperatures = packet.get("m", packet.get("motor_temperatures_c"))
+    if temperatures is None:
+        raise TelemetryError("Missing telemetry field: m (or motor_temperatures_c)")
     if not isinstance(temperatures, dict):
         raise TelemetryError("motor_temperatures_c must be an object")
     if len(temperatures) > 21:
@@ -59,9 +75,9 @@ def parse_telemetry(line: bytes) -> Telemetry | None:
             raise TelemetryError("Motor names must contain 1-64 characters")
         validated_temperatures[name] = _number(value, f"Temperature for {name}")
     return Telemetry(
-        _number(packet["x_mm"], "x_mm"),
-        _number(packet["y_mm"], "y_mm"),
-        _number(packet["heading_deg"], "heading_deg") % 360,
+        _number(x_val, "x_mm"),
+        _number(y_val, "y_mm"),
+        _number(h_val, "heading_deg") % 360,
         validated_temperatures,
     )
 

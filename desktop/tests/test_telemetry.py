@@ -29,6 +29,13 @@ class TelemetryTests(unittest.TestCase):
         assert negative is not None
         self.assertEqual(negative.heading_deg, 270)
 
+    def test_compact_packet_format(self) -> None:
+        compact = b'{"x":150.5,"y":-300,"h":400,"m":{"left":41.2}}\r\n'
+        result = parse_telemetry(compact)
+        assert result is not None
+        self.assertEqual((result.x_mm, result.y_mm, result.heading_deg), (150.5, -300, 40))
+        self.assertEqual(result.motor_temperatures_c, {"left": 41.2})
+
     def test_console_text_is_not_telemetry(self) -> None:
         for frame in (b"Hello\r\n", b"", b"Robot ready"):
             with self.subTest(frame=frame):

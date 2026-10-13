@@ -32,10 +32,10 @@ def serial_monitor():
         while True:
             elapsed = brain.timer.time(SECONDS) - started
             x_mm, y_mm, heading_deg, left_c, right_c = read_telemetry(elapsed)
-            # One complete JSON object per line; no JSON library needed on the brain.
+            # Compact JSON keys save serial bandwidth and increase responsiveness:
+            # {"x":...,"y":...,"h":...,"m":{"left_drive":...,"right_drive":...}}
             packet = (
-                '{"x_mm":%.1f,"y_mm":%.1f,"heading_deg":%.1f,'
-                '"motor_temperatures_c":{"left_drive":%.1f,"right_drive":%.1f}}\r\n'
+                '{"x":%.1f,"y":%.1f,"h":%.1f,"m":{"left_drive":%.1f,"right_drive":%.1f}}\r\n'
                 % (x_mm, y_mm, heading_deg, left_c, right_c)
             )
             serial_port.write(packet.encode('utf-8'))
